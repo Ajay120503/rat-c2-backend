@@ -12,34 +12,34 @@ const registerDevice = async (req, res) => {
       simInfo, totalStorage, usedStorage,
     } = req.body;
 
-    let device = await Device.findOne({ deviceId });
-
-    if (device) {
-      device.isOnline = true;
-      device.lastSeen = new Date();
-      if (deviceName) device.deviceName = deviceName;
-      if (manufacturer) device.manufacturer = manufacturer;
-      if (model) device.model = model;
-      if (androidVersion) device.androidVersion = androidVersion;
-      if (sdkVersion) device.sdkVersion = sdkVersion;
-      if (ipAddress) device.ipAddress = ipAddress;
-      if (batteryLevel !== undefined) device.batteryLevel = batteryLevel;
-      if (isCharging !== undefined) device.isCharging = isCharging;
-      if (networkType) device.networkType = networkType;
-      if (simInfo) device.simInfo = simInfo;
-      if (totalStorage) device.totalStorage = totalStorage;
-      if (usedStorage) device.usedStorage = usedStorage;
-    } else {
-      device = new Device({
-        deviceId, deviceName, manufacturer, model,
-        androidVersion, sdkVersion, ipAddress,
-        batteryLevel, isCharging, networkType,
-        simInfo, totalStorage, usedStorage,
+    const update = {
+      $set: {
         isOnline: true,
-      });
-    }
+        lastSeen: new Date(),
+      },
+      $setOnInsert: {
+        firstConnected: new Date(),
+      },
+    };
 
-    await device.save();
+    if (deviceName) update.$set.deviceName = deviceName;
+    if (manufacturer) update.$set.manufacturer = manufacturer;
+    if (model) update.$set.model = model;
+    if (androidVersion) update.$set.androidVersion = androidVersion;
+    if (sdkVersion) update.$set.sdkVersion = sdkVersion;
+    if (ipAddress) update.$set.ipAddress = ipAddress;
+    if (batteryLevel !== undefined) update.$set.batteryLevel = batteryLevel;
+    if (isCharging !== undefined) update.$set.isCharging = isCharging;
+    if (networkType) update.$set.networkType = networkType;
+    if (simInfo) update.$set.simInfo = simInfo;
+    if (totalStorage) update.$set.totalStorage = totalStorage;
+    if (usedStorage) update.$set.usedStorage = usedStorage;
+
+    const device = await Device.findOneAndUpdate(
+      { deviceId },
+      update,
+      { upsert: true, new: true }
+    );
 
     // Return pending commands for this device
     const pendingCommands = await Command.find({
