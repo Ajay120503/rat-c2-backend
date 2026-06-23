@@ -91,7 +91,6 @@ const deviceSchema = new mongoose.Schema({
   }],
 });
 
-deviceSchema.index({ deviceId: 1 });
 deviceSchema.index({ isOnline: 1 });
 
 module.exports = mongoose.model('Device', deviceSchema);
