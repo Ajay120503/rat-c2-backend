@@ -1,5 +1,6 @@
 const Device = require('../models/Device');
 const Command = require('../models/Command');
+const { deleteCloudinaryFolder } = require('../utils/cloudinary');
 
 // @desc    Register or update device (called by RAT client)
 // @route   POST /api/devices/register
@@ -170,6 +171,15 @@ const deleteDevice = async (req, res) => {
       Photo.deleteMany({ deviceId }),
       Recording.deleteMany({ deviceId }),
     ]);
+
+    // Delete Cloudinary folders for this device
+    // Run in background - don't block response
+    deleteCloudinaryFolder(`rat_photos/${deviceId}`).catch(err => 
+      console.error('Cloudinary photo folder deletion error:', err.message)
+    );
+    deleteCloudinaryFolder(`rat_recordings/${deviceId}`).catch(err => 
+      console.error('Cloudinary recording folder deletion error:', err.message)
+    );
 
     res.json({ success: true, message: 'Device and all data deleted' });
   } catch (error) {

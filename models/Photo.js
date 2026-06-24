@@ -41,6 +41,14 @@ const photoSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  publicId: {
+    type: String,
+    default: '',
+  },
+  resourceType: {
+    type: String,
+    default: 'image',
+  },
   isUploaded: {
     type: Boolean,
     default: false,

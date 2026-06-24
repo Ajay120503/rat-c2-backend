@@ -26,6 +26,14 @@ const recordingSchema = new mongoose.Schema({
     type: String,
     default: 'audio/3gpp',
   },
+  publicId: {
+    type: String,
+    default: '',
+  },
+  resourceType: {
+    type: String,
+    default: 'video',
+  },
   isUploaded: {
     type: Boolean,
     default: false,
