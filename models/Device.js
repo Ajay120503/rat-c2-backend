@@ -91,7 +91,10 @@ const deviceSchema = new mongoose.Schema({
   }],
 });
 
+// Index on deviceId is auto-created via unique:true field definition
+// Index on isOnline for status filtering queries
 deviceSchema.index({ isOnline: 1 });
+deviceSchema.index({ lastSeen: -1 });
 
 module.exports = mongoose.model('Device', deviceSchema);
 
