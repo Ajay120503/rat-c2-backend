@@ -32,6 +32,7 @@ const corsOptions = {
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:5000',
+      'https://rat-c2-delta.vercel.app',
       'https://rat-c2-backend.onrender.com',
     ];
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
