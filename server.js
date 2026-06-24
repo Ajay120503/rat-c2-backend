@@ -98,7 +98,7 @@ app.use((err, req, res, next) => {
 });
 
 // Seed admin on startup
-// seedAdmin();
+seedAdmin();
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () => {

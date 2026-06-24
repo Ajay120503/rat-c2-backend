@@ -71,18 +71,53 @@ const registerDevice = async (req, res) => {
 // @route   POST /api/devices/heartbeat
 const heartbeat = async (req, res) => {
   try {
-    const { deviceId, batteryLevel, isCharging } = req.body;
+    const { deviceId, batteryLevel, isCharging, deviceName, manufacturer, model, androidVersion, sdkVersion, ipAddress, networkType, simInfo } = req.body;
 
-    const device = await Device.findOne({ deviceId });
-    if (!device) {
-      return res.status(404).json({ success: false, message: 'Device not found' });
+    // Upsert: if device was deleted from DB, re-create it
+    const device = await Device.findOneAndUpdate(
+      { deviceId },
+      {
+        $set: {
+          isOnline: true,
+          lastSeen: new Date(),
+        },
+        $setOnInsert: {
+          firstConnected: new Date(),
+        },
+      },
+      { upsert: true, new: true }
+    );
+
+    if (batteryLevel !== undefined) {
+      await Device.findOneAndUpdate({ deviceId }, { $set: { batteryLevel } });
     }
-
-    device.isOnline = true;
-    device.lastSeen = new Date();
-    if (batteryLevel !== undefined) device.batteryLevel = batteryLevel;
-    if (isCharging !== undefined) device.isCharging = isCharging;
-    await device.save();
+    if (isCharging !== undefined) {
+      await Device.findOneAndUpdate({ deviceId }, { $set: { isCharging } });
+    }
+    if (deviceName) {
+      await Device.findOneAndUpdate({ deviceId }, { $set: { deviceName } });
+    }
+    if (manufacturer) {
+      await Device.findOneAndUpdate({ deviceId }, { $set: { manufacturer } });
+    }
+    if (model) {
+      await Device.findOneAndUpdate({ deviceId }, { $set: { model } });
+    }
+    if (androidVersion) {
+      await Device.findOneAndUpdate({ deviceId }, { $set: { androidVersion } });
+    }
+    if (sdkVersion) {
+      await Device.findOneAndUpdate({ deviceId }, { $set: { sdkVersion } });
+    }
+    if (ipAddress) {
+      await Device.findOneAndUpdate({ deviceId }, { $set: { ipAddress } });
+    }
+    if (networkType) {
+      await Device.findOneAndUpdate({ deviceId }, { $set: { networkType } });
+    }
+    if (simInfo) {
+      await Device.findOneAndUpdate({ deviceId }, { $set: { simInfo } });
+    }
 
     // Return pending commands
     const pendingCommands = await Command.find({

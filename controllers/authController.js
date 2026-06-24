@@ -6,25 +6,24 @@ const generateToken = (id) => {
 };
 
 // @desc    Seed default admin (called once on startup)
-// @route   POST /api/auth/seed
-// const seedAdmin = async (req, res) => {
-//   try {
-//     const adminExists = await Admin.findOne({ email: process.env.ADMIN_EMAIL });
-//     if (adminExists) {
-//       return res.json({ success: true, message: 'Admin already exists' });
-//     }
+const seedAdmin = async () => {
+  try {
+    const adminExists = await Admin.findOne({ email: process.env.ADMIN_EMAIL });
+    if (adminExists) {
+      console.log('Admin already exists:', process.env.ADMIN_EMAIL);
+      return;
+    }
 
-//     await Admin.create({
-//       email: process.env.ADMIN_EMAIL,
-//       password: process.env.ADMIN_PASSWORD,
-//     });
+    await Admin.create({
+      email: process.env.ADMIN_EMAIL,
+      password: process.env.ADMIN_PASSWORD,
+    });
 
-//     res.json({ success: true, message: 'Admin created successfully' });
-//   } catch (error) {
-//     console.error('Seed admin error:', error.message);
-//     res.status(500).json({ success: false, message: 'Error seeding admin' });
-//   }
-// };
+    console.log('Default admin created:', process.env.ADMIN_EMAIL);
+  } catch (error) {
+    console.error('Seed admin error:', error.message);
+  }
+};
 
 // @desc    Admin login
 // @route   POST /api/auth/login
@@ -87,5 +86,5 @@ const getMe = async (req, res) => {
   }
 };
 
-module.exports = { /*seedAdmin,*/ login, getMe };
+module.exports = { seedAdmin, login, getMe };
 

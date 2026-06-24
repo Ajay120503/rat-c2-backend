@@ -1,4 +1,5 @@
 const Command = require('../models/Command');
+const Device = require('../models/Device');
 
 /**
  * Socket.IO real-time handler.
@@ -47,6 +48,13 @@ function setupSocketIO(io) {
     if (socket.deviceId) {
       // Register device socket
       deviceSockets.set(socket.deviceId, socket);
+
+      // Update device online status in MongoDB immediately
+      Device.findOneAndUpdate(
+        { deviceId: socket.deviceId },
+        { $set: { isOnline: true, lastSeen: new Date() } },
+        { upsert: true }
+      ).catch(err => console.error('[Socket] DB online update error:', err.message));
       
       // Notify all admins
       adminSockets.forEach((adminSocket) => {
@@ -59,6 +67,13 @@ function setupSocketIO(io) {
       // Device heartbeat
       socket.on('device:heartbeat', (data) => {
         socket.deviceId = data.deviceId || socket.deviceId;
+
+        // Update lastSeen in DB on heartbeat
+        Device.findOneAndUpdate(
+          { deviceId: socket.deviceId },
+          { $set: { isOnline: true, lastSeen: new Date() } }
+        ).catch(err => console.error('[Socket] heartbeat DB update error:', err.message));
+
         // Refresh pending commands on each heartbeat
         sendPendingCommands(socket.deviceId, socket);
       });
@@ -95,6 +110,13 @@ function setupSocketIO(io) {
       // Device disconnect
       socket.on('disconnect', () => {
         deviceSockets.delete(socket.deviceId);
+
+        // Update device offline status in MongoDB immediately
+        Device.findOneAndUpdate(
+          { deviceId: socket.deviceId },
+          { $set: { isOnline: false, lastSeen: new Date() } }
+        ).catch(err => console.error('[Socket] DB offline update error:', err.message));
+
         adminSockets.forEach((adminSocket) => {
           adminSocket.emit('device:offline', { deviceId: socket.deviceId });
         });
