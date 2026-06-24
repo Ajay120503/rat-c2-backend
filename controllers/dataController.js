@@ -330,6 +330,16 @@ const getDeviceData = async (req, res) => {
         .limit(20);
     }
 
+    if (!type || type === 'accounts') {
+      const device = await Device.findOne({ deviceId });
+      data.accounts = device?.accounts || [];
+    }
+
+    if (!type || type === 'apps') {
+      const device = await Device.findOne({ deviceId });
+      data.apps = device?.installedApps || [];
+    }
+
     res.json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
